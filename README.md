@@ -72,6 +72,9 @@ Music-Recommendation-System/
 6. **Open your browser and go to:**
    [http://127.0.0.1:5000](http://127.0.0.1:5000)
 
+## Live Demo
+You can try the app live at: [https://music-recommendation-system-eight.vercel.app](https://music-recommendation-system-eight.vercel.app)
+
 ## Customization
 - To change the look and feel, edit `templates/index.html` and the CSS inside it.
 - To improve or change the recommendation logic, edit `Training.py`.
