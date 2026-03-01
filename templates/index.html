@@ -2,11 +2,569 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spotify</title>
+    <title>SONIX — Music Intelligence</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Crimson+Pro:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+    <style>
+        :root {
+            --neon-cyan:     #00f5ff;
+            --neon-magenta:  #ff006e;
+            --neon-yellow:   #f5e642;
+            --neon-green:    #39ff14;
+            --neon-purple:   #8b80ff;
+            --bg-void:       #020208;
+            --glass:         rgba(255,255,255,0.03);
+            --border-glow:   rgba(0,245,255,0.2);
+            --mood-energetic:#ff006e;
+            --mood-chill:    #00f5ff;
+            --mood-happy:    #f5e642;
+            --mood-sad:      #8b80ff;
+            --mood-focus:    #39ff14;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background:var(--bg-void); color:#e0e0f0; font-family:'DM Mono',monospace; min-height:100vh; overflow-x:hidden; cursor:none; }
+
+        /* CURSOR */
+        .cursor { position:fixed; top:0; left:0; z-index:9999; pointer-events:none; }
+        .cursor-dot  { width:8px; height:8px; background:var(--neon-cyan); border-radius:50%; position:absolute; transform:translate(-50%,-50%); box-shadow:0 0 12px var(--neon-cyan); }
+        .cursor-ring { width:36px; height:36px; border:1.5px solid var(--neon-cyan); border-radius:50%; position:absolute; transform:translate(-50%,-50%); opacity:.5; transition:all .15s ease; }
+
+        /* GRID BG */
+        .grid-bg { position:fixed; inset:0; z-index:0; background-image:linear-gradient(rgba(0,245,255,.04)1px,transparent 1px),linear-gradient(90deg,rgba(0,245,255,.04)1px,transparent 1px); background-size:60px 60px; animation:gridDrift 20s linear infinite; }
+        @keyframes gridDrift { 100%{transform:translateY(60px)} }
+
+        /* AMBIENT */
+        .ambient { position:fixed; z-index:0; pointer-events:none; border-radius:50%; filter:blur(120px); opacity:.10; animation:pulse 8s ease-in-out infinite alternate; }
+        .a1{width:600px;height:600px;background:var(--neon-cyan);top:-200px;left:-200px;animation-delay:0s}
+        .a2{width:500px;height:500px;background:var(--neon-magenta);bottom:-200px;right:-100px;animation-delay:3s}
+        .a3{width:300px;height:300px;background:var(--neon-yellow);top:50%;left:50%;animation-delay:6s}
+        @keyframes pulse{from{opacity:.07;transform:scale(1)}to{opacity:.15;transform:scale(1.1)}}
+
+        /* VINYL DECO */
+        .vinyl-deco  {position:fixed;right:-130px;top:50%;transform:translateY(-50%);width:380px;height:380px;z-index:0;opacity:.07;animation:vSpin 12s linear infinite;}
+        .vinyl-deco-l{position:fixed;left:-100px;bottom:-80px;width:260px;height:260px;z-index:0;opacity:.05;animation:vSpinR 20s linear infinite;}
+        @keyframes vSpin {to{transform:translateY(-50%) rotate(360deg)}}
+        @keyframes vSpinR{to{transform:rotate(360deg)}}
+
+        /* WAVEFORM BG */
+        .waveform-bg{position:fixed;bottom:0;left:0;right:0;height:80px;display:flex;align-items:flex-end;gap:3px;padding:0 20px;z-index:0;opacity:.10;}
+        .wave-bar{flex:1;background:var(--neon-cyan);border-radius:2px 2px 0 0;animation:waveA 1.2s ease-in-out infinite alternate;min-height:4px;}
+        @keyframes waveA{from{height:4px}to{height:var(--h)}}
+
+        /* LOADING */
+        .loading-overlay{display:none;position:fixed;inset:0;z-index:100;background:rgba(2,2,8,.92);backdrop-filter:blur(20px);align-items:center;justify-content:center;flex-direction:column;gap:24px;}
+        .loading-overlay.show{display:flex;}
+        .vinyl-spin{width:100px;height:100px;animation:vSpinLoad 2s linear infinite;}
+        @keyframes vSpinLoad{to{transform:rotate(360deg)}}
+        .loading-text{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--neon-cyan);animation:blink 1.2s ease-in-out infinite;}
+        @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+        /* LAYOUT */
+        .app-wrapper{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:40px 24px 120px;}
+
+        /* HEADER */
+        .app-header{text-align:center;margin-bottom:56px;}
+        .logo-tag{font-size:11px;letter-spacing:6px;color:var(--neon-cyan);text-transform:uppercase;margin-bottom:12px;opacity:.7;}
+        .logo-main{font-family:'Bebas Neue',cursive;font-size:clamp(72px,12vw,130px);line-height:.85;letter-spacing:8px;background:linear-gradient(135deg,#fff 0%,var(--neon-cyan) 50%,var(--neon-magenta) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;display:inline-block;position:relative;}
+        .logo-main::after{content:'SONIX';position:absolute;inset:0;background:linear-gradient(135deg,#fff 0%,var(--neon-cyan) 50%,var(--neon-magenta) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:blur(20px);opacity:.4;z-index:-1;}
+        .logo-sub{font-family:'Crimson Pro',serif;font-style:italic;font-weight:300;font-size:18px;color:rgba(224,224,240,.45);margin-top:8px;letter-spacing:2px;}
+        .header-line{width:200px;height:1px;background:linear-gradient(90deg,transparent,var(--neon-cyan),transparent);margin:24px auto 0;}
+
+        /* STATS */
+        .stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:40px;}
+        .stat-card{background:var(--glass);border:1px solid var(--border-glow);border-radius:16px;padding:20px 24px;position:relative;overflow:hidden;backdrop-filter:blur(20px);transition:all .3s ease;}
+        .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--neon-cyan),var(--neon-magenta));transform:scaleX(0);transform-origin:left;transition:transform .4s ease;}
+        .stat-card:hover{border-color:rgba(0,245,255,.5);transform:translateY(-4px);}
+        .stat-card:hover::before{transform:scaleX(1);}
+        .stat-label{font-size:10px;letter-spacing:4px;text-transform:uppercase;color:rgba(224,224,240,.4);margin-bottom:8px;}
+        .stat-value{font-family:'Bebas Neue',cursive;font-size:36px;letter-spacing:2px;color:var(--neon-cyan);line-height:1;text-shadow:0 0 30px rgba(0,245,255,.5);}
+        .stat-detail{font-size:11px;color:rgba(224,224,240,.35);margin-top:4px;}
+
+        /* SEARCH */
+        .search-section{background:var(--glass);border:1px solid var(--border-glow);border-radius:24px;padding:36px;backdrop-filter:blur(24px);margin-bottom:40px;position:relative;overflow:hidden;}
+        .search-section::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--neon-magenta),transparent);}
+        .mode-toggle{display:flex;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:50px;padding:4px;margin-bottom:32px;width:fit-content;gap:4px;}
+        .mode-btn{padding:10px 28px;border-radius:50px;border:none;background:transparent;color:rgba(224,224,240,.4);font-family:'DM Mono',monospace;font-size:12px;letter-spacing:2px;text-transform:uppercase;cursor:none;transition:all .3s ease;}
+        .mode-btn.active{background:linear-gradient(135deg,var(--neon-cyan),var(--neon-magenta));color:#000;font-weight:500;box-shadow:0 4px 20px rgba(0,245,255,.3);}
+        .search-panel{display:none;}
+        .search-panel.active{display:block;animation:fadeUp .4s ease;}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+        .input-group-custom{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:end;}
+        .input-wrap{position:relative;}
+        .input-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(224,224,240,.35);margin-bottom:8px;display:block;}
+        .neon-input{width:100%;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px 20px;color:#fff;font-family:'DM Mono',monospace;font-size:14px;letter-spacing:1px;outline:none;transition:all .3s ease;}
+        .neon-input:focus{border-color:var(--neon-cyan);box-shadow:0 0 0 1px var(--neon-cyan),0 0 24px rgba(0,245,255,.12);background:rgba(0,245,255,.03);}
+        .neon-input::placeholder{color:rgba(224,224,240,.2);}
+        .num-input-wrap{min-width:140px;}
+        .search-btn{padding:16px 32px;border:none;border-radius:12px;font-family:'DM Mono',monospace;font-size:12px;letter-spacing:3px;text-transform:uppercase;cursor:none;position:relative;overflow:hidden;transition:all .3s ease;white-space:nowrap;}
+        .search-btn-song  {background:linear-gradient(135deg,var(--neon-cyan),#0080ff);color:#000;font-weight:500;}
+        .search-btn-artist{background:linear-gradient(135deg,var(--neon-magenta),#ff8800);color:#000;font-weight:500;}
+        .search-btn::after{content:'';position:absolute;inset:0;background:rgba(255,255,255,.2);transform:translateX(-100%) skewX(-15deg);transition:transform .4s ease;}
+        .search-btn:hover::after{transform:translateX(200%) skewX(-15deg);}
+        .search-btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,245,255,.3);}
+
+        /* ═══ MOOD FILTER ═══ */
+        .mood-section{margin-top:28px;padding-top:24px;border-top:1px solid rgba(255,255,255,.05);}
+        .mood-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+        .mood-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(224,224,240,.35);}
+        .mood-status{font-size:11px;letter-spacing:1px;transition:all .3s;}
+        .mood-status .cnt{color:var(--neon-cyan);font-weight:500;}
+        .mood-status .mname{opacity:.6;}
+
+        .mood-pills{display:flex;gap:8px;flex-wrap:wrap;}
+        .mood-pill{
+            padding:8px 18px;border-radius:50px;
+            border:1px solid rgba(255,255,255,.08);
+            background:transparent;color:rgba(224,224,240,.45);
+            font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;
+            cursor:none;transition:all .25s ease;position:relative;
+        }
+        .mood-pill:hover{transform:translateY(-2px);}
+        .mood-pill.disabled{opacity:.22;pointer-events:none;}
+
+        /* per-mood active states */
+        .mood-pill.active[data-mood="all"]      {border-color:#e0e0f0;color:#e0e0f0;background:rgba(224,224,240,.06);box-shadow:0 0 16px rgba(224,224,240,.12);}
+        .mood-pill.active[data-mood="energetic"]{border-color:var(--mood-energetic);color:var(--mood-energetic);background:rgba(255,0,110,.07);box-shadow:0 0 18px rgba(255,0,110,.25);}
+        .mood-pill.active[data-mood="chill"]    {border-color:var(--mood-chill);color:var(--mood-chill);background:rgba(0,245,255,.07);box-shadow:0 0 18px rgba(0,245,255,.25);}
+        .mood-pill.active[data-mood="happy"]    {border-color:var(--mood-happy);color:var(--mood-happy);background:rgba(245,230,66,.07);box-shadow:0 0 18px rgba(245,230,66,.25);}
+        .mood-pill.active[data-mood="sad"]      {border-color:var(--mood-sad);color:var(--mood-sad);background:rgba(139,128,255,.07);box-shadow:0 0 18px rgba(139,128,255,.25);}
+        .mood-pill.active[data-mood="focus"]    {border-color:var(--mood-focus);color:var(--mood-focus);background:rgba(57,255,20,.07);box-shadow:0 0 18px rgba(57,255,20,.25);}
+
+        .pill-badge{display:inline-block;margin-left:6px;background:rgba(255,255,255,.12);font-size:9px;padding:1px 5px;border-radius:8px;vertical-align:middle;transition:all .3s;}
+        .mood-pill.active .pill-badge{background:rgba(255,255,255,.2);}
+
+        /* ERROR */
+        .error-bar{display:flex;align-items:center;gap:12px;padding:16px 24px;background:rgba(255,0,110,.08);border:1px solid rgba(255,0,110,.3);border-radius:12px;margin-bottom:28px;color:#ff80aa;font-size:13px;animation:fadeUp .3s ease;}
+        .error-icon{width:20px;height:20px;border:1.5px solid var(--neon-magenta);border-radius:50%;display:grid;place-items:center;font-size:11px;flex-shrink:0;color:var(--neon-magenta);}
+
+        /* VISUALIZER */
+        .visualizer-section{display:none;margin-bottom:32px;padding:20px 24px;background:var(--glass);border:1px solid var(--border-glow);border-radius:16px;backdrop-filter:blur(20px);}
+        .visualizer-section.show{display:block;animation:fadeUp .5s ease;}
+        .vis-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(224,224,240,.3);margin-bottom:12px;}
+        .vis-bars{display:flex;gap:3px;align-items:flex-end;height:48px;}
+        .vis-bar{flex:1;background:linear-gradient(180deg,var(--neon-cyan),var(--neon-magenta));border-radius:2px 2px 0 0;animation:visBar .8s ease-in-out infinite alternate;min-height:4px;transition:background .4s;}
+        @keyframes visBar{from{height:4px}to{height:var(--h,20px)}}
+
+        /* RECS */
+        .now-playing-chip{display:inline-flex;align-items:center;gap:10px;padding:8px 16px;background:rgba(0,245,255,.06);border:1px solid rgba(0,245,255,.2);border-radius:50px;font-size:12px;color:var(--neon-cyan);letter-spacing:1px;margin-bottom:20px;transition:all .3s;}
+        .now-playing-dot{width:8px;height:8px;border-radius:50%;background:var(--neon-magenta);box-shadow:0 0 8px var(--neon-magenta);animation:blink 1s ease infinite;}
+        .recs-header{display:flex;align-items:baseline;gap:16px;margin-bottom:24px;}
+        .recs-title{font-family:'Bebas Neue',cursive;font-size:42px;letter-spacing:4px;background:linear-gradient(135deg,#fff,var(--neon-cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+        .recs-count{font-size:11px;letter-spacing:2px;color:rgba(224,224,240,.3);text-transform:uppercase;transition:all .3s;}
+        .recs-divider{height:1px;background:linear-gradient(90deg,var(--neon-cyan),transparent);margin-bottom:20px;}
+
+        /* TRACK CARD */
+        .tracks-grid{display:flex;flex-direction:column;gap:8px;}
+        .track-card{
+            display:grid;grid-template-columns:48px 1fr auto;
+            align-items:start;gap:16px;
+            padding:18px 20px;
+            background:var(--glass);border:1px solid rgba(255,255,255,.05);
+            border-radius:14px;transition:all .35s cubic-bezier(.4,0,.2,1);
+            position:relative;overflow:hidden;
+            animation:trackSlide .5s ease both;
+        }
+        .track-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--card-stripe,linear-gradient(180deg,var(--neon-cyan),var(--neon-magenta)));transform:scaleY(0);transform-origin:bottom;transition:transform .3s ease;}
+        .track-card:hover{border-color:rgba(0,245,255,.2);background:rgba(0,245,255,.025);transform:translateX(6px);}
+        .track-card:hover::before{transform:scaleY(1);}
+        .track-card.filtered-out{opacity:0!important;transform:translateX(-12px) scale(.97)!important;pointer-events:none;max-height:0;padding-top:0;padding-bottom:0;margin:0;border-width:0;overflow:hidden;}
+        @keyframes trackSlide{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
+
+        .track-num{font-family:'Bebas Neue',cursive;font-size:28px;color:rgba(255,255,255,.1);text-align:center;transition:color .3s;padding-top:2px;}
+        .track-card:hover .track-num{color:var(--neon-cyan);}
+
+        .track-info{min-width:0;}
+        .track-name  {font-size:14px;font-weight:500;color:#e0e0f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px;letter-spacing:.5px;}
+        .track-artist{font-family:'Crimson Pro',serif;font-style:italic;font-size:13px;color:rgba(224,224,240,.35);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:8px;}
+
+        /* mood badges */
+        .track-moods{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;}
+        .mood-badge{font-size:9px;letter-spacing:1px;padding:2px 7px;border-radius:4px;text-transform:uppercase;font-weight:500;border:1px solid;white-space:nowrap;}
+        .mood-badge[data-mood="energetic"]{color:var(--mood-energetic);border-color:rgba(255,0,110,.35);background:rgba(255,0,110,.06);}
+        .mood-badge[data-mood="chill"]    {color:var(--mood-chill);border-color:rgba(0,245,255,.35);background:rgba(0,245,255,.06);}
+        .mood-badge[data-mood="happy"]    {color:var(--mood-happy);border-color:rgba(245,230,66,.35);background:rgba(245,230,66,.06);}
+        .mood-badge[data-mood="sad"]      {color:var(--mood-sad);border-color:rgba(139,128,255,.35);background:rgba(139,128,255,.06);}
+        .mood-badge[data-mood="focus"]    {color:var(--mood-focus);border-color:rgba(57,255,20,.35);background:rgba(57,255,20,.06);}
+
+        /* feature bars (hover-reveal) */
+        .feature-bars{display:none;flex-direction:column;gap:4px;margin-top:4px;}
+        .track-card:hover .feature-bars{display:flex;animation:fadeUp .25s ease;}
+        .feat-row{display:flex;align-items:center;gap:8px;}
+        .feat-name{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(224,224,240,.25);width:68px;flex-shrink:0;}
+        .feat-track{flex:1;height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;}
+        .feat-fill{height:100%;border-radius:2px;}
+        .feat-val{font-size:8px;color:rgba(224,224,240,.25);width:28px;text-align:right;}
+
+        /* mini wave right col */
+        .card-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;padding-top:4px;}
+        .mini-wave{display:flex;align-items:center;gap:2px;height:20px;opacity:0;transition:opacity .3s;}
+        .track-card:hover .mini-wave{opacity:1;}
+        .mini-bar{width:2px;background:var(--neon-cyan);border-radius:1px;animation:miniWave .6s ease-in-out infinite alternate;}
+        .mini-bar:nth-child(1){height:6px;animation-delay:0s}
+        .mini-bar:nth-child(2){height:14px;animation-delay:.1s}
+        .mini-bar:nth-child(3){height:10px;animation-delay:.2s}
+        .mini-bar:nth-child(4){height:18px;animation-delay:.05s}
+        .mini-bar:nth-child(5){height:8px;animation-delay:.15s}
+        @keyframes miniWave{from{height:3px}to{height:var(--h)}}
+
+        /* EMPTY STATE */
+        .empty-state{display:none;text-align:center;padding:60px 20px;}
+        .empty-state.show{display:block;animation:fadeUp .4s ease;}
+        .empty-icon{font-size:48px;margin-bottom:16px;opacity:.3;}
+        .empty-title{font-family:'Bebas Neue',cursive;font-size:32px;letter-spacing:3px;color:rgba(224,224,240,.3);margin-bottom:8px;}
+        .empty-sub{font-size:12px;color:rgba(224,224,240,.2);letter-spacing:1px;}
+
+        /* AUTOCOMPLETE */
+        .ui-autocomplete{background:#0a0a1a!important;border:1px solid rgba(0,245,255,.2)!important;border-radius:12px!important;box-shadow:0 16px 40px rgba(0,0,0,.6)!important;font-family:'DM Mono',monospace!important;font-size:13px!important;z-index:9998!important;overflow:hidden!important;padding:4px!important;}
+        .ui-menu-item-wrapper{padding:10px 16px!important;border-radius:8px!important;color:rgba(224,224,240,.7)!important;transition:all .15s!important;}
+        .ui-state-active,.ui-menu-item-wrapper:hover{background:rgba(0,245,255,.08)!important;color:var(--neon-cyan)!important;border:none!important;}
+
+        /* SCROLL TOP */
+        .scroll-top{position:fixed;bottom:32px;right:32px;width:44px;height:44px;border:1px solid rgba(0,245,255,.3);border-radius:50%;background:rgba(0,245,255,.06);color:var(--neon-cyan);display:grid;place-items:center;cursor:none;opacity:0;transform:translateY(20px);transition:all .3s;z-index:50;backdrop-filter:blur(10px);}
+        .scroll-top.visible{opacity:1;transform:translateY(0);}
+        .scroll-top:hover{background:rgba(0,245,255,.15);}
+
+        /* PARTICLES */
+        .particle{position:fixed;pointer-events:none;z-index:0;opacity:0;animation:floatP 6s ease-in-out infinite;}
+        @keyframes floatP{0%{opacity:0;transform:translateY(0) rotate(0)}20%{opacity:.15}80%{opacity:.1}100%{opacity:0;transform:translateY(-200px) rotate(360deg)}}
+
+        @media(max-width:768px){
+            .stats-row{grid-template-columns:1fr 1fr;}
+            .input-group-custom{grid-template-columns:1fr;}
+            .vinyl-deco,.vinyl-deco-l{display:none;}
+            .track-card{grid-template-columns:40px 1fr;}
+            .track-card .card-right{display:none;}
+        }
+    </style>
 </head>
 <body>
-    <h1>Hello World</h1>
+
+<div class="cursor"><div class="cursor-ring" id="cursorRing"></div><div class="cursor-dot" id="cursorDot"></div></div>
+<div class="grid-bg"></div>
+<div class="ambient a1"></div><div class="ambient a2"></div><div class="ambient a3"></div>
+
+<!-- Vinyl deco -->
+<div class="vinyl-deco">
+  <svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="99" fill="#111" stroke="#333" stroke-width=".5"/><circle cx="100" cy="100" r="80" fill="none" stroke="#222" stroke-width="4"/><circle cx="100" cy="100" r="60" fill="none" stroke="#1a1a2e" stroke-width="3"/><circle cx="100" cy="100" r="40" fill="none" stroke="#222" stroke-width="2"/><circle cx="100" cy="100" r="20" fill="#333"/><circle cx="100" cy="100" r="5" fill="#00f5ff" opacity=".9"/></svg>
+</div>
+<div class="vinyl-deco-l">
+  <svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="99" fill="#111" stroke="#333" stroke-width=".5"/><circle cx="100" cy="100" r="70" fill="none" stroke="#222" stroke-width="3"/><circle cx="100" cy="100" r="40" fill="none" stroke="#1a1a2e" stroke-width="2"/><circle cx="100" cy="100" r="20" fill="#333"/><circle cx="100" cy="100" r="5" fill="#ff006e" opacity=".9"/></svg>
+</div>
+
+<div class="waveform-bg" id="waveformBg"></div>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="vinyl-spin">
+        <svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="99" fill="#111" stroke="rgba(0,245,255,.3)" stroke-width="1"/><circle cx="100" cy="100" r="75" fill="none" stroke="rgba(0,245,255,.15)" stroke-width="4"/><circle cx="100" cy="100" r="55" fill="none" stroke="rgba(255,0,110,.15)" stroke-width="3"/><circle cx="100" cy="100" r="35" fill="none" stroke="rgba(0,245,255,.15)" stroke-width="2"/><circle cx="100" cy="100" r="18" fill="#222"/><circle cx="100" cy="100" r="6" fill="#00f5ff"/></svg>
+    </div>
+    <div class="loading-text">Searching the cosmos…</div>
+</div>
+
+<div class="scroll-top" id="scrollTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
+</div>
+
+<!-- ═══════════════════  APP  ═══════════════════ -->
+<div class="app-wrapper">
+
+    <header class="app-header">
+        <div class="logo-tag">▸ Music Intelligence System</div>
+        <div class="logo-main">SONIX</div>
+        <div class="logo-sub">Discover your next obsession</div>
+        <div class="header-line"></div>
+    </header>
+
+    <!-- STATS -->
+    <div class="stats-row">
+        <div class="stat-card">
+            <div class="stat-label">▸ Library Size</div>
+            <div class="stat-value" id="animTotal">0</div>
+            <div class="stat-detail">tracks indexed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">▸ Most Popular</div>
+            <div class="stat-value" style="font-size:18px;color:var(--neon-magenta);text-shadow:0 0 30px rgba(255,0,110,.5);">
+                {{ most_popular_song[:22] }}{% if most_popular_song|length > 22 %}…{% endif %}
+            </div>
+            <div class="stat-detail">{{ most_popular_artist[:30] }}{% if most_popular_artist|length > 30 %}…{% endif %} · Score {{ most_popular_count }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">▸ Top 10 by Popularity</div>
+            <canvas id="popularityChart" height="80"></canvas>
+        </div>
+    </div>
+
+    <!-- SEARCH -->
+    <div class="search-section">
+        <div class="mode-toggle">
+            <button class="mode-btn active" id="modeSong"   onclick="switchMode('Song')">♪ By Song</button>
+            <button class="mode-btn"        id="modeArtist" onclick="switchMode('Artist')">♫ By Artist</button>
+        </div>
+        <div class="search-panel active" id="panelSong">
+            <form method="POST" onsubmit="showLoading()">
+                <div class="input-group-custom">
+                    <div class="input-wrap"><label class="input-label" for="song_name">▸ Track name</label><input type="text" id="song_name" name="song_name" class="neon-input" placeholder="e.g. Blinding Lights" autocomplete="off"></div>
+                    <div class="input-wrap num-input-wrap"><label class="input-label" for="num_recs">▸ Results</label><input type="number" id="num_recs" name="num_recs" class="neon-input" min="1" max="20" value="5"></div>
+                    <div class="input-wrap"><label class="input-label">&nbsp;</label><button type="submit" class="search-btn search-btn-song">Discover →</button></div>
+                </div>
+            </form>
+        </div>
+        <div class="search-panel" id="panelArtist">
+            <form method="POST" onsubmit="showLoading()">
+                <div class="input-group-custom">
+                    <div class="input-wrap"><label class="input-label" for="artist_name">▸ Artist name</label><input type="text" id="artist_name" name="artist_name" class="neon-input" placeholder="e.g. The Weeknd" autocomplete="off"></div>
+                    <div class="input-wrap num-input-wrap"><label class="input-label" for="num_recs_artist">▸ Results</label><input type="number" id="num_recs_artist" name="num_recs_artist" class="neon-input" min="1" max="20" value="5"></div>
+                    <div class="input-wrap"><label class="input-label">&nbsp;</label><button type="submit" class="search-btn search-btn-artist">Explore →</button></div>
+                </div>
+            </form>
+        </div>
+
+        <!-- ═══ VIBE FILTER ═══ -->
+        <div class="mood-section">
+            <div class="mood-header">
+                <span class="mood-label">▸ Filter by Vibe</span>
+                <span class="mood-status" id="moodStatus">
+                    {% if recommendations %}<span class="cnt">{{ recommendations|length }}</span> <span class="mname">tracks · all vibes</span>{% endif %}
+                </span>
+            </div>
+            <div class="mood-pills">
+                <button class="mood-pill active" data-mood="all"       onclick="setMood(this)">All</button>
+                <button class="mood-pill"         data-mood="energetic" onclick="setMood(this)">⚡ Energetic <span class="pill-badge" id="cnt-energetic">–</span></button>
+                <button class="mood-pill"         data-mood="chill"     onclick="setMood(this)">❄ Chill     <span class="pill-badge" id="cnt-chill">–</span></button>
+                <button class="mood-pill"         data-mood="happy"     onclick="setMood(this)">☀ Happy     <span class="pill-badge" id="cnt-happy">–</span></button>
+                <button class="mood-pill"         data-mood="sad"       onclick="setMood(this)">🌧 Melancholy <span class="pill-badge" id="cnt-sad">–</span></button>
+                <button class="mood-pill"         data-mood="focus"     onclick="setMood(this)">◎ Focus     <span class="pill-badge" id="cnt-focus">–</span></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ERROR -->
+    {% if error %}
+    <div class="error-bar"><div class="error-icon">!</div>{{ error }}</div>
+    {% endif %}
+
+    <!-- VISUALIZER -->
+    {% if recommendations %}
+    <div class="visualizer-section show">
+        <div class="vis-label">▸ Recommendation Signature</div>
+        <div class="vis-bars" id="visBars"></div>
+    </div>
+    {% endif %}
+
+    <!-- RESULTS -->
+    {% if recommendations %}
+    <div id="recsSection">
+        <div class="now-playing-chip">
+            <div class="now-playing-dot"></div>
+            <span id="chipText">{{ recommendations|length }} tracks loaded</span>
+        </div>
+        <div class="recs-header">
+            <div class="recs-title">Your Picks</div>
+            <div class="recs-count" id="recsCount">{{ recommendations|length }} tracks</div>
+        </div>
+        <div class="recs-divider"></div>
+
+        <div class="tracks-grid" id="tracksGrid">
+            {% for rec in recommendations %}
+            <div class="track-card"
+                 data-moods="{{ rec.moods_json }}"
+                 data-energy="{{ rec.features.energy }}"
+                 data-valence="{{ rec.features.valence }}"
+                 data-dance="{{ rec.features.danceability }}"
+                 data-acoustic="{{ rec.features.acousticness }}"
+                 data-tempo="{{ rec.features.tempo_norm }}"
+                 style="animation-delay:{{ loop.index0 * 0.07 }}s">
+
+                <div class="track-num">{{ loop.index }}</div>
+
+                <div class="track-info">
+                    <div class="track-name">{{ rec.name }}</div>
+                    <div class="track-artist">{{ rec.artist }}</div>
+                    <div class="track-moods">
+                        {% for mood in rec.moods %}{% if mood != 'all' %}
+                        <span class="mood-badge" data-mood="{{ mood }}">{{ mood }}</span>
+                        {% endif %}{% endfor %}
+                    </div>
+                    <!-- Feature mini-bars – revealed on hover via CSS -->
+                    <div class="feature-bars">
+                        <div class="feat-row"><span class="feat-name">Energy</span><div class="feat-track"><div class="feat-fill" style="width:{{ (rec.features.energy*100)|int }}%;background:#ff006e;"></div></div><span class="feat-val">{{ "%.0f"|format(rec.features.energy*100) }}%</span></div>
+                        <div class="feat-row"><span class="feat-name">Valence</span><div class="feat-track"><div class="feat-fill" style="width:{{ (rec.features.valence*100)|int }}%;background:#f5e642;"></div></div><span class="feat-val">{{ "%.0f"|format(rec.features.valence*100) }}%</span></div>
+                        <div class="feat-row"><span class="feat-name">Dance</span><div class="feat-track"><div class="feat-fill" style="width:{{ (rec.features.danceability*100)|int }}%;background:#00f5ff;"></div></div><span class="feat-val">{{ "%.0f"|format(rec.features.danceability*100) }}%</span></div>
+                        <div class="feat-row"><span class="feat-name">Acoustic</span><div class="feat-track"><div class="feat-fill" style="width:{{ (rec.features.acousticness*100)|int }}%;background:#8b80ff;"></div></div><span class="feat-val">{{ "%.0f"|format(rec.features.acousticness*100) }}%</span></div>
+                        <div class="feat-row"><span class="feat-name">Tempo</span><div class="feat-track"><div class="feat-fill" style="width:{{ (rec.features.tempo_norm*100)|int }}%;background:#39ff14;"></div></div><span class="feat-val">{{ "%.0f"|format(rec.features.tempo_norm*100) }}%</span></div>
+                    </div>
+                </div>
+
+                <div class="card-right">
+                    <div class="mini-wave">
+                        <div class="mini-bar" style="--h:6px"></div>
+                        <div class="mini-bar" style="--h:14px"></div>
+                        <div class="mini-bar" style="--h:10px"></div>
+                        <div class="mini-bar" style="--h:18px"></div>
+                        <div class="mini-bar" style="--h:8px"></div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="empty-state" id="emptyState">
+            <div class="empty-icon">🎵</div>
+            <div class="empty-title">No Matches</div>
+            <div class="empty-sub">None of your tracks match this vibe — try another filter</div>
+        </div>
+    </div>
+    {% endif %}
+
+</div><!-- /app-wrapper -->
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// ── CURSOR ──────────────────────────────────────────────────────────────────
+const dot=document.getElementById('cursorDot'),ring=document.getElementById('cursorRing');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;dot.style.left=mx+'px';dot.style.top=my+'px';});
+(function ar(){rx+=(mx-rx)*.12;ry+=(my-ry)*.12;ring.style.left=rx+'px';ring.style.top=ry+'px';requestAnimationFrame(ar);})();
+document.querySelectorAll('button,a,input').forEach(el=>{
+    el.addEventListener('mouseenter',()=>{ring.style.width='52px';ring.style.height='52px';ring.style.borderColor='var(--neon-magenta)';});
+    el.addEventListener('mouseleave',()=>{ring.style.width='36px';ring.style.height='36px';ring.style.borderColor='var(--neon-cyan)';});
+});
+
+// ── WAVEFORM BG ─────────────────────────────────────────────────────────────
+const wbg=document.getElementById('waveformBg');
+for(let i=0;i<80;i++){const b=document.createElement('div');b.className='wave-bar';b.style.setProperty('--h',(Math.random()*70+10)+'px');b.style.animationDuration=(0.8+Math.random()*1.2)+'s';b.style.animationDelay=(Math.random()*1.5)+'s';wbg.appendChild(b);}
+
+// ── STAT COUNTER ────────────────────────────────────────────────────────────
+const total={{total_songs}},animEl=document.getElementById('animTotal');let t0=null;
+function ac(ts){if(!t0)t0=ts;const p=Math.min((ts-t0)/1800,1),e=1-Math.pow(1-p,3);animEl.textContent=Math.floor(e*total).toLocaleString();if(p<1)requestAnimationFrame(ac);}
+setTimeout(()=>requestAnimationFrame(ac),300);
+
+// ── CHART ───────────────────────────────────────────────────────────────────
+new Chart(document.getElementById('popularityChart').getContext('2d'),{type:'bar',data:{labels:{{chart_labels|tojson}},datasets:[{data:{{chart_values|tojson}},backgroundColor:ctx=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,100);g.addColorStop(0,'rgba(0,245,255,.85)');g.addColorStop(1,'rgba(255,0,110,.4)');return g;},borderRadius:4,borderSkipped:false}]},options:{responsive:true,animation:{duration:1500,easing:'easeOutQuart'},plugins:{legend:{display:false}},scales:{x:{ticks:{color:'rgba(224,224,240,.3)',font:{family:'DM Mono',size:8},maxRotation:45},grid:{color:'rgba(255,255,255,.03)'}},y:{ticks:{color:'rgba(224,224,240,.3)',font:{family:'DM Mono',size:9}},grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true}}}});
+
+// ── MODE SWITCH ─────────────────────────────────────────────────────────────
+function switchMode(m){['Song','Artist'].forEach(x=>{document.getElementById('panel'+x).classList.remove('active');document.getElementById('mode'+x).classList.remove('active');});document.getElementById('panel'+m).classList.add('active');document.getElementById('mode'+m).classList.add('active');}
+
+// ── LOADING ──────────────────────────────────────────────────────────────────
+function showLoading(){document.getElementById('loadingOverlay').classList.add('show');}
+
+// ── AUTOCOMPLETE ────────────────────────────────────────────────────────────
+$(function(){
+    $("#song_name").autocomplete({source:(r,cb)=>$.ajax({url:"/autocomplete",data:{q:r.term},success:cb}),minLength:2,delay:150});
+    $("#artist_name").autocomplete({source:(r,cb)=>$.ajax({url:"/autocomplete_artist",data:{q:r.term},success:cb}),minLength:2,delay:150});
+});
+
+// ── VISUALIZER ───────────────────────────────────────────────────────────────
+const vb=document.getElementById('visBars');
+if(vb){for(let i=0;i<60;i++){const b=document.createElement('div');b.className='vis-bar';b.style.setProperty('--h',(Math.random()*44+4)+'px');b.style.animationDuration=(0.5+Math.random()*1.2)+'s';b.style.animationDelay=(Math.random()*.8)+'s';vb.appendChild(b);}}
+
+// ── MOOD FILTER — FULL IMPLEMENTATION ───────────────────────────────────────
+const MOODS = ['energetic','chill','happy','sad','focus'];
+const MOOD_COLORS = {energetic:'#ff006e',chill:'#00f5ff',happy:'#f5e642',sad:'#8b80ff',focus:'#39ff14'};
+let activeMood = 'all';
+
+function getMoodCounts(){
+    const counts={};
+    MOODS.forEach(m=>counts[m]=0);
+    document.querySelectorAll('.track-card').forEach(card=>{
+        let moods=[];try{moods=JSON.parse(card.dataset.moods);}catch(e){}
+        MOODS.forEach(m=>{if(moods.includes(m))counts[m]++;});
+    });
+    return counts;
+}
+
+function setMood(btn){
+    const mood = btn.dataset.mood;
+    if(mood === activeMood) return;
+    activeMood = mood;
+
+    const cards = Array.from(document.querySelectorAll('.track-card'));
+    const empty = document.getElementById('emptyState');
+    let visible = 0;
+
+    cards.forEach((card, i)=>{
+        let moods=[]; try{moods=JSON.parse(card.dataset.moods);}catch(e){}
+        const show = (mood==='all') || moods.includes(mood);
+
+        if(show){
+            // Stagger the reveal
+            setTimeout(()=>{
+                card.classList.remove('filtered-out');
+                card.style.transition='all .35s cubic-bezier(.4,0,.2,1)';
+            }, visible * 40);
+            visible++;
+        } else {
+            card.style.transition='all .25s ease';
+            card.classList.add('filtered-out');
+        }
+    });
+
+    // UI updates
+    const rc  = document.getElementById('recsCount');
+    const ct  = document.getElementById('chipText');
+    const ms  = document.getElementById('moodStatus');
+    const moodLabel = mood==='all' ? 'all vibes' : mood;
+
+    if(rc) rc.textContent = visible + ' track'+(visible!==1?'s':'');
+    if(ct) ct.textContent = visible + ' tracks · ' + moodLabel;
+    if(ms) ms.innerHTML   = `<span class="cnt">${visible}</span> <span class="mname">tracks · ${moodLabel}</span>`;
+    if(empty) empty.classList.toggle('show', visible===0);
+
+    // Pill active states
+    document.querySelectorAll('.mood-pill').forEach(p=>{
+        p.classList.toggle('active', p.dataset.mood===mood);
+    });
+
+    // Tint visualizer bars to mood colour
+    if(vb){
+        const col = mood==='all'
+            ? null
+            : MOOD_COLORS[mood];
+        vb.querySelectorAll('.vis-bar').forEach(b=>{
+            b.style.background = col
+                ? `linear-gradient(180deg,${col},rgba(0,0,0,0))`
+                : 'linear-gradient(180deg,var(--neon-cyan),var(--neon-magenta))';
+        });
+    }
+}
+
+// Init: populate counts, grey out zero-match pills
+(function initMoods(){
+    const cards = document.querySelectorAll('.track-card');
+    if(!cards.length) return;
+    const counts = getMoodCounts();
+    const total  = cards.length;
+
+    MOODS.forEach(m=>{
+        const badge = document.getElementById('cnt-'+m);
+        const pill  = document.querySelector(`.mood-pill[data-mood="${m}"]`);
+        if(badge) badge.textContent = counts[m];
+        if(pill && counts[m]===0) pill.classList.add('disabled');
+    });
+
+    // Set all-count display
+    const ms = document.getElementById('moodStatus');
+    if(ms) ms.innerHTML = `<span class="cnt">${total}</span> <span class="mname">tracks · all vibes</span>`;
+})();
+
+// ── SCROLL TOP ──────────────────────────────────────────────────────────────
+const stBtn=document.getElementById('scrollTop');
+window.addEventListener('scroll',()=>stBtn.classList.toggle('visible',scrollY>300));
+
+// ── FLOATING NOTES ───────────────────────────────────────────────────────────
+const notes=['♩','♪','♫','♬'];
+setInterval(()=>{
+    const n=document.createElement('div');n.className='particle';
+    n.textContent=notes[Math.floor(Math.random()*notes.length)];
+    const c=['var(--neon-cyan)','var(--neon-magenta)','var(--neon-yellow)'][Math.floor(Math.random()*3)];
+    n.style.cssText=`left:${Math.random()*innerWidth}px;bottom:0;color:${c};font-size:${12+Math.random()*16}px;animation-duration:${4+Math.random()*4}s`;
+    document.body.appendChild(n);setTimeout(()=>n.remove(),8000);
+},1800);
+</script>
 </body>
 </html>

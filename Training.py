@@ -6,7 +6,7 @@ import seaborn as sns
 from tqdm import tqdm
 sns.set()
 
-data = pd.read_csv('/Users/rishi/BTECH/Programming/My_Projects/Music_Recommendation_System/Dataset/data.csv')
+data = pd.read_csv('Dataset/data.csv')
 # data.head()
 # data.info()
 df = data.drop(columns=['id','name','artists','release_date'])
