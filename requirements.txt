@@ -6,3 +6,4 @@ seaborn
 tqdm
 scikit-learn
 streamlit
+altair
